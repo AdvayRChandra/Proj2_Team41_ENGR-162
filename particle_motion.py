@@ -12,7 +12,16 @@ class Particle:
     def __init__(self, **kwargs):
         self.mass = float(kwargs.get("mass", 1.0))
         self.charge = float(kwargs.get("charge", 0.0))
-        self.volume = float(kwargs.get("volume", 1.0))
+
+        # Prefer explicit diameter (plus inferred volume), else fall back to volume.
+        if "diameter" in kwargs and kwargs["diameter"] is not None:
+            self.diameter = float(kwargs["diameter"])
+            self.radius = self.diameter / 2.0
+            self.volume = 4.0 / 3.0 * math.pi * self.radius ** 3
+        else:
+            self.volume = float(kwargs.get("volume", 1.0))
+            self.radius = (3.0 * self.volume / (4.0 * math.pi)) ** (1.0 / 3.0)
+            self.diameter = 2.0 * self.radius
 
         pos = kwargs.get("position", (0.0, 0.0))
         vel = kwargs.get("velocity", (0.0, 0.0))
@@ -23,8 +32,6 @@ class Particle:
         self.acceleration = [float(acc[0]), float(acc[1])]
 
         self.density = self.mass / self.volume
-        self.radius = (3 * self.volume / (4 * math.pi)) ** (1/3)  # Assuming spherical particle
-        self.diameter = 2 * self.radius
 
     def magnitude_velocity(velocity):
         return math.sqrt(velocity[0]**2 + velocity[1]**2)
