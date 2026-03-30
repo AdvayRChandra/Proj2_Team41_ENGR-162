@@ -2,6 +2,7 @@ import math
 
 g = 9.81  # m/s^2, acceleration due to gravity
 viscosity_air = 1.81e-5  # kg/(m·s), dynamic viscosity of air at room temperature
+e0 = 8.854e-12  # F/m, vacuum permittivity
 
 class Air:
     def __init__(self, **kwargs):
@@ -45,6 +46,10 @@ class Particle:
         stokes_x = 0.5 * air.density * 24 / self.reynolds_number(air)
         stokes_x *= math.pi / 8 * self.diameter**2 * self.magnitude_velocity(self.v_apparent) * self.v_apparent[dimension]
         return stokes_x
+    
+    def electrostatic_force(self, surfaceChargeDensity: float):
+        # Electrostatic force due to surface charge density
+        return self.charge * surfaceChargeDensity / e0
 
     def buoyancy(self, air: Air):
         return g * (self.density - air.density) * self.mass  # Buoyant force minus weight
