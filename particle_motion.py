@@ -1,45 +1,76 @@
-import numpy as np
+import math
 
-class Particle(np.ndarray):
+g = 9.81  # m/s^2, acceleration due to gravity
+viscosity_air = 1.81e-5  # kg/(m·s), dynamic viscosity of air at room temperature
+
+class Air:
     def __init__(self, **kwargs):
-        mass = kwargs.get("mass")
-        rad = kwargs.get("rad")
-        position = kwargs.get("position")
-        velocity = kwargs.get("velocity")
-        acceleration = kwargs.get("acceleration")
+        self.velocity = float(kwargs.get("velocity", 0.0))  # m/s
+        self.density = float(kwargs.get("density", 1.225))  # kg/m^3 at sea level
 
-        super().__init__([rad, position, velocity, acceleration], 
-                         dtype=[("rad", "float32"), 
-                                ("position", "float32"), 
-                                ("velocity", "float32"), 
-                                ("acceleration", "float32")])
-        
-        self.mass = kwargs.get("mass", mass)
-        self.density = mass / (4/3 * np.pi * rad**3)
+class Particle:
+    def __init__(self, **kwargs):
+        self.mass = float(kwargs.get("mass", 1.0))
+        self.charge = float(kwargs.get("charge", 0.0))
+        self.volume = float(kwargs.get("volume", 1.0))
 
-    def force_x(self, **kwargs):
-        # Placeholder for force function in x direction
-        v_air = kwargs.get("v_air", 0.0)
-        v = self["velocity"].norm()
+        pos = kwargs.get("position", (0.0, 0.0))
+        vel = kwargs.get("velocity", (0.0, 0.0))
+        acc = kwargs.get("acceleration", (0.0, 0.0))
 
-        
+        self.position = [float(pos[0]), float(pos[1])]
+        self.velocity = [float(vel[0]), float(vel[1])]
+        self.acceleration = [float(acc[0]), float(acc[1])]
+
+        self.density = self.mass / self.volume
+        self.radius = (3 * self.volume / (4 * math.pi)) ** (1/3)  # Assuming spherical particle
+        self.diameter = 2 * self.radius
+
+    def magnitude_velocity(velocity):
+        return math.sqrt(velocity[0]**2 + velocity[1]**2)
+
+    def renolds_number(self, air: Air):
+        return 24 / (air.density * self.magnitude_velocity(self.v_apparent) * self.diameter / viscosity_air)
+
+    def stokes(self, air: Air, dimension: int):
+        # Stokes' drag in x direction
+        self.v_apparent = self.velocity[0] - air.velocity[0]
+        stokes_x = air.density * 24 / self.reynolds_number(air)
+        stokes_x *= math.pi / 8 * self.diameter**2 * self.magnitude_velocity(self.v_apparent) * self.v_apparent[dimension]
+        return stokes_x
+
+    def buoyancy(self, air: Air):
+        return g * (self.density - air.density) * self.diameter**3 * math.pi / 6  # Buoyant force minus weight
+
+    def force_x(self, air: Air, **kwargs):
+        # Placeholder for force function in x direction (to be overridden or provided via kwargs)
+        v_apparent = [self.velocity[0] - air.velocity[0], self.velocity[1] - air.velocity[1]]
+        # Here we can add drag, lift, etc. currently returns 0.
         return 0.0
 
-    def force_y(self, **kwargs):
+    def force_y(self, air: Air, **kwargs):
         # Placeholder for force function in y direction
+        v_apparent = [self.velocity[0] - air.velocity[0], self.velocity[1] - air.velocity[1]]
+        # Here we can add drag, lift, etc. currently returns 0.
         return 0.0
 
-    def acceleration_x(self, **kwargs):
-        return self.force_x(**kwargs) / self["mass"]
-    
-    def acceleration_y(self, **kwargs):
-        return self.force_y(**kwargs) / self["mass"]
-    
-    def update_particle(self, function = None, dt: float = 1.0):
-        # Update the velocity based on the provided function
-        self["position"][0] += self["velocity"][0] * dt + 0.5 * self.acceleration_x(**function) * dt**2
-        self["position"][1] += self["velocity"][1] * dt + 0.5 * self.acceleration_y(**function) * dt**2
-        self["velocity"][0] += self.acceleration_x(**function) * dt
-        self["velocity"][1] += self.acceleration_y(**function) * dt
-        self["acceleration"][0] = self.acceleration_x(**function)
-        self["acceleration"][1] = self.acceleration_y(**function)
+    def acceleration_x(self, air: Air, **kwargs):
+        return self.force_x(air, **kwargs) / self.mass
+
+    def acceleration_y(self, air: Air, **kwargs):
+        return self.force_y(air, **kwargs) / self.mass
+
+    def update_particle(self, air: Air, dt: float = 1.0):
+        self.v_apparent = [self.velocity[0] - air.velocity[0], self.velocity[1] - air.velocity[1]]
+
+        ax = self.acceleration_x(air, **function)
+        ay = self.acceleration_y(air, **function)
+
+        self.position[0] += self.velocity[0] * dt + 0.5 * ax * dt * dt
+        self.position[1] += self.velocity[1] * dt + 0.5 * ay * dt * dt
+
+        self.velocity[0] += ax * dt
+        self.velocity[1] += ay * dt
+
+        self.acceleration[0] = ax
+        self.acceleration[1] = ay
