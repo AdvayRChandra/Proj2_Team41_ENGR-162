@@ -315,10 +315,14 @@ def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hist
     with open(csv_path, 'w', newline='') as csvfile:
         fieldnames = [
             'month', 'pm2_5_caught', 'pm2_5_escaped', 'pm10_caught', 'pm10_escaped',
-            'pm2_5_percent_caught', 'pm10_percent_caught'
+            'pm2_5_capture_rate', 'pm10_capture_rate', 'pm2_5_percent_caught', 'pm10_percent_caught',
+            'pm2_5_mean_rate', 'pm2_5_std_rate', 'pm10_mean_rate', 'pm10_std_rate'
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
+
+        all_pm2_5_rates = []
+        all_pm10_rates = []
 
         for month, samples in monthly_results.items():
             pm2_5_caught = sum(sample['pm2_5_caught'] for sample in samples)
@@ -329,34 +333,95 @@ def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hist
             pm25_perc = 100.0 * pm2_5_caught / (pm2_5_total + 1e-12)
             pm10_perc = 100.0 * pm10_caught / (pm10_total + 1e-12)
 
+            pm2_5_capture_rate = pm2_5_caught / (pm2_5_total + 1e-12)
+            pm10_capture_rate = pm10_caught / (pm10_total + 1e-12)
+
+            pm2_5_rates = [s['pm2_5_percent_caught'] / 100.0 for s in samples]
+            pm10_rates = [s['pm10_percent_caught'] / 100.0 for s in samples]
+            all_pm2_5_rates.extend(pm2_5_rates)
+            all_pm10_rates.extend(pm10_rates)
+
+            mean_pm2_5 = sum(pm2_5_rates) / len(pm2_5_rates)
+            mean_pm10 = sum(pm10_rates) / len(pm10_rates)
+            std_pm2_5 = (sum((r - mean_pm2_5)**2 for r in pm2_5_rates) / len(pm2_5_rates))**0.5
+            std_pm10 = (sum((r - mean_pm10)**2 for r in pm10_rates) / len(pm10_rates))**0.5
+
             writer.writerow({
                 'month': month,
                 'pm2_5_caught': pm2_5_caught,
                 'pm2_5_escaped': pm2_5_total - pm2_5_caught,
                 'pm10_caught': pm10_caught,
                 'pm10_escaped': pm10_total - pm10_caught,
+                'pm2_5_capture_rate': pm2_5_capture_rate,
+                'pm10_capture_rate': pm10_capture_rate,
                 'pm2_5_percent_caught': pm25_perc,
                 'pm10_percent_caught': pm10_perc,
+                'pm2_5_mean_rate': mean_pm2_5,
+                'pm2_5_std_rate': std_pm2_5,
+                'pm10_mean_rate': mean_pm10,
+                'pm10_std_rate': std_pm10,
             })
+
+            # append detail file or print
+            print(f"{month}: PM2.5 mean_rate={mean_pm2_5:.6f}, std={std_pm2_5:.6f}, PM10 mean_rate={mean_pm10:.6f}, std={std_pm10:.6f}")
 
             percent_samples_pm25 = [sample['pm2_5_percent_caught'] for sample in samples]
             percent_samples_pm10 = [sample['pm10_percent_caught'] for sample in samples]
 
             plt.figure(figsize=(8, 4))
-            plt.hist(percent_samples_pm25, bins=10, alpha=0.6, label='PM2.5')
-            plt.hist(percent_samples_pm10, bins=10, alpha=0.6, label='PM10')
+            plt.hist(percent_samples_pm25, bins=10, alpha=0.6, label='PM2.5 % caught')
+            plt.hist(percent_samples_pm10, bins=10, alpha=0.6, label='PM10 % caught')
             plt.xlabel('Percent caught (%)')
             plt.ylabel('Frequency')
-            plt.title(f'{month} sampling distribution ({len(samples)} samples)')
+            plt.title(f'{month} percent caught sampling distribution ({len(samples)} samples)')
             plt.legend()
+            plt.axvline(100*mean_pm2_5, color='blue', linestyle='--', label=f'PM2.5 mean {100*mean_pm2_5:.3f}%')
+            plt.axvline(100*mean_pm10, color='orange', linestyle='--', label=f'PM10 mean {100*mean_pm10:.3f}%')
+            plt.text(0.95, 0.95, f'PM2.5 σ={std_pm2_5:.4f}\nPM10 σ={std_pm10:.4f}', transform=plt.gca().transAxes, ha='right', va='top', bbox=dict(facecolor='white', alpha=0.75))
             plt.tight_layout()
 
-            filename_sampling = os.path.join(out_dir, f'{month.lower()}_sampling_hist.png')
-            plt.savefig(filename_sampling)
+            filename_percent_sampling = os.path.join(out_dir, f'{month.lower()}_percent_sampling_hist.png')
+            plt.savefig(filename_percent_sampling)
             if show_plots:
                 plt.show()
             plt.close()
-            print(f"Saved sampling histogram for {month} to {filename_sampling}")
+            print(f"Saved percent sampling histogram for {month} to {filename_percent_sampling}")
+
+            plt.figure(figsize=(8, 4))
+            plt.hist(pm2_5_rates, bins=10, alpha=0.6, label='PM2.5 capture rate')
+            plt.hist(pm10_rates, bins=10, alpha=0.6, label='PM10 capture rate')
+            plt.xlabel('Capture rate (fraction)')
+            plt.ylabel('Frequency')
+            plt.title(f'{month} capture rate sampling distribution ({len(samples)} samples)')
+            plt.legend()
+            plt.axvline(mean_pm2_5, color='blue', linestyle='--', label=f'PM2.5 mean {mean_pm2_5:.6f}')
+            plt.axvline(mean_pm10, color='orange', linestyle='--', label=f'PM10 mean {mean_pm10:.6f}')
+            plt.text(0.95, 0.95, f'PM2.5 σ={std_pm2_5:.6f}\nPM10 σ={std_pm10:.6f}', transform=plt.gca().transAxes, ha='right', va='top', bbox=dict(facecolor='white', alpha=0.75))
+            plt.tight_layout()
+
+            filename_rate_sampling = os.path.join(out_dir, f'{month.lower()}_rate_sampling_hist.png')
+            plt.savefig(filename_rate_sampling)
+            if show_plots:
+                plt.show()
+            plt.close()
+            print(f"Saved capture rate sampling histogram for {month} to {filename_rate_sampling}")
+
+        # aggregate all months total histogram
+        plt.figure(figsize=(10, 5))
+        plt.hist(all_pm2_5_rates, bins=20, alpha=0.6, label='PM2.5 capture rate')
+        plt.hist(all_pm10_rates, bins=20, alpha=0.6, label='PM10 capture rate')
+        plt.xlabel('Capture rate (fraction)')
+        plt.ylabel('Frequency')
+        plt.title('Combined all-month capture rate sampling distribution')
+        plt.legend()
+        plt.tight_layout()
+
+        filename_all_rate = os.path.join(out_dir, 'all_months_rate_sampling_hist.png')
+        plt.savefig(filename_all_rate)
+        if show_plots:
+            plt.show()
+        plt.close()
+        print(f"Saved all-month capture rate sampling histogram to {filename_all_rate}")
 
     print(f"Saved monthly aggregated CSV data to {csv_path}")
 
@@ -561,8 +626,12 @@ if __name__ == "__main__":
         pm10_caught = sum(s['pm10_caught'] for s in sample_list)
         pm10_total = sum(s['pm10_total'] for s in sample_list)
 
+        pm2_5_capture_rate = pm2_5_caught / (pm2_5_total + 1e-12)
+        pm10_capture_rate = pm10_caught / (pm10_total + 1e-12)
+
         print(f"{month}: PM2.5 avg caught %={(100*pm2_5_caught/(pm2_5_total+1e-12)):.3f}, "
-              f"PM10 avg caught %={(100*pm10_caught/(pm10_total+1e-12)):.3f}")
+              f"PM10 avg caught %={(100*pm10_caught/(pm10_total+1e-12)):.3f}, "
+              f"PM2.5 rate={pm2_5_capture_rate:.5f}, PM10 rate={pm10_capture_rate:.5f}")
 
     try:
         plot_monthly_caught_histograms(monthly_samples, out_dir='monthly_sampling_hists', csv_path='monthly_sampling.csv', show_plots=False)
