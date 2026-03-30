@@ -35,39 +35,33 @@ class Particle:
     def stokes(self, air: Air, dimension: int):
         # Stokes' drag in x direction
         self.v_apparent = self.velocity[0] - air.velocity[0]
-        stokes_x = air.density * 24 / self.reynolds_number(air)
+        stokes_x = 0.5 * air.density * 24 / self.reynolds_number(air)
         stokes_x *= math.pi / 8 * self.diameter**2 * self.magnitude_velocity(self.v_apparent) * self.v_apparent[dimension]
         return stokes_x
 
     def buoyancy(self, air: Air):
-        return g * (self.density - air.density) * self.diameter**3 * math.pi / 6  # Buoyant force minus weight
+        return g * (self.density - air.density) * self.mass  # Buoyant force minus weight
 
-    def force_x(self, air: Air, **kwargs):
-        # Placeholder for force function in x direction (to be overridden or provided via kwargs)
-        v_apparent = [self.velocity[0] - air.velocity[0], self.velocity[1] - air.velocity[1]]
-        # Here we can add drag, lift, etc. currently returns 0.
-        return 0.0
+    def force_x(self, air: Air):
+        return self.stokes(air, 0)  # Drag in x direction
 
-    def force_y(self, air: Air, **kwargs):
-        # Placeholder for force function in y direction
-        v_apparent = [self.velocity[0] - air.velocity[0], self.velocity[1] - air.velocity[1]]
-        # Here we can add drag, lift, etc. currently returns 0.
-        return 0.0
+    def force_y(self, air: Air):
+        return self.buoyancy(air) - self.stokes(air, 1)  # Buoyancy minus drag in y direction
 
-    def acceleration_x(self, air: Air, **kwargs):
-        return self.force_x(air, **kwargs) / self.mass
+    def acceleration_x(self, air: Air):
+        return self.force_x(air) / self.mass
 
-    def acceleration_y(self, air: Air, **kwargs):
-        return self.force_y(air, **kwargs) / self.mass
+    def acceleration_y(self, air: Air):
+        return self.force_y(air) / self.mass
 
     def update_particle(self, air: Air, dt: float = 1.0):
         self.v_apparent = [self.velocity[0] - air.velocity[0], self.velocity[1] - air.velocity[1]]
 
-        ax = self.acceleration_x(air, **function)
-        ay = self.acceleration_y(air, **function)
+        ax = self.acceleration_x(air)
+        ay = self.acceleration_y(air)
 
-        self.position[0] += self.velocity[0] * dt + 0.5 * ax * dt * dt
-        self.position[1] += self.velocity[1] * dt + 0.5 * ay * dt * dt
+        self.position[0] += self.velocity[0] * dt + 0.5 * ax * dt ** 2
+        self.position[1] += self.velocity[1] * dt + 0.5 * ay * dt ** 2
 
         self.velocity[0] += ax * dt
         self.velocity[1] += ay * dt
