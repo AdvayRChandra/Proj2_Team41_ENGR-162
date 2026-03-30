@@ -302,7 +302,7 @@ def plot_percent_caught(monthly_results, save_path='percent_caught.png'):
         print("Headless backend used (Agg); cannot display interactive window, view saved file.")
 
 
-def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hists', csv_path='monthly_caught.csv', show_plots=True):
+def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hists', csv_path='monthly_caught.csv', show_plots=True, num_particles=5000, viscosity=viscosity_air):
     import os
     import csv
     try:
@@ -373,7 +373,7 @@ def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hist
             plt.hist(percent_samples_pm10, bins=10, alpha=0.6, label='PM10 % caught')
             plt.xlabel('Percent caught (%)')
             plt.ylabel('Frequency')
-            plt.title(f'{month} percent caught sampling distribution ({len(samples)} samples)')
+            plt.title(f'{month} percent caught sampling distribution ({len(samples)} samples) - viscosity {viscosity:.3e} kg/(m*s)')
             plt.legend()
             plt.axvline(100*mean_pm2_5, color='blue', linestyle='--', label=f'PM2.5 mean {100*mean_pm2_5:.3f}%')
             plt.axvline(100*mean_pm10, color='orange', linestyle='--', label=f'PM10 mean {100*mean_pm10:.3f}%')
@@ -390,9 +390,10 @@ def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hist
             plt.figure(figsize=(8, 4))
             plt.hist(pm2_5_rates, bins=10, alpha=0.6, label='PM2.5 capture rate')
             plt.hist(pm10_rates, bins=10, alpha=0.6, label='PM10 capture rate')
-            plt.xlabel('Capture rate (fraction)')
+            plt.xlabel('Capture rate (fraction of batch captured; unitless, e.g. 0.1 = 10% of particles)')
             plt.ylabel('Frequency')
             plt.title(f'{month} capture rate sampling distribution ({len(samples)} samples)')
+            plt.suptitle('Initial particle mix: 70% PM2.5, 30% PM10 (by number)')
             plt.legend()
             plt.axvline(mean_pm2_5, color='blue', linestyle='--', label=f'PM2.5 mean {mean_pm2_5:.6f}')
             plt.axvline(mean_pm10, color='orange', linestyle='--', label=f'PM10 mean {mean_pm10:.6f}')
@@ -406,13 +407,44 @@ def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hist
             plt.close()
             print(f"Saved capture rate sampling histogram for {month} to {filename_rate_sampling}")
 
-        # aggregate all months total histogram
+        # aggregate all months total histogram for percent and rate
+        all_pm2_5_percent = [r * 100.0 for r in all_pm2_5_rates]
+        all_pm10_percent = [r * 100.0 for r in all_pm10_rates]
+
+        all_mean_pm2_5_rate = sum(all_pm2_5_rates) / len(all_pm2_5_rates)
+        all_mean_pm10_rate = sum(all_pm10_rates) / len(all_pm10_rates)
+        all_std_pm2_5_rate = (sum((r - all_mean_pm2_5_rate)**2 for r in all_pm2_5_rates) / len(all_pm2_5_rates))**0.5
+        all_std_pm10_rate = (sum((r - all_mean_pm10_rate)**2 for r in all_pm10_rates) / len(all_pm10_rates))**0.5
+
+        plt.figure(figsize=(10, 5))
+        plt.hist(all_pm2_5_percent, bins=20, alpha=0.6, label='PM2.5 % caught')
+        plt.hist(all_pm10_percent, bins=20, alpha=0.6, label='PM10 % caught')
+        plt.xlabel('Percent caught (%)')
+        plt.ylabel('Frequency')
+        plt.title(f'All-month percent sampling distribution (samples={len(all_pm2_5_rates)}, particles/sample={num_particles}, viscosity={viscosity:.5f})')
+        plt.axvline(all_mean_pm2_5_rate * 100, color='blue', linestyle='--', label=f'PM2.5 mean {all_mean_pm2_5_rate*100:.4f}%')
+        plt.axvline(all_mean_pm10_rate * 100, color='orange', linestyle='--', label=f'PM10 mean {all_mean_pm10_rate*100:.4f}%')
+        plt.text(0.95, 0.95, f'PM2.5 σ={all_std_pm2_5_rate:.6f}\nPM10 σ={all_std_pm10_rate:.6f}', transform=plt.gca().transAxes, ha='right', va='top', bbox=dict(facecolor='white', alpha=0.75))
+        plt.legend()
+        plt.tight_layout()
+
+        filename_all_percent = os.path.join(out_dir, 'all_months_percent_sampling_hist.png')
+        plt.savefig(filename_all_percent)
+        if show_plots:
+            plt.show()
+        plt.close()
+        print(f"Saved all-month percent sampling histogram to {filename_all_percent}")
+
         plt.figure(figsize=(10, 5))
         plt.hist(all_pm2_5_rates, bins=20, alpha=0.6, label='PM2.5 capture rate')
         plt.hist(all_pm10_rates, bins=20, alpha=0.6, label='PM10 capture rate')
-        plt.xlabel('Capture rate (fraction)')
+        plt.xlabel('Capture rate (fraction of batch captured; unitless, e.g. 0.1 = 10% of particles)')
         plt.ylabel('Frequency')
-        plt.title('Combined all-month capture rate sampling distribution')
+        plt.title(f'All-month capture rate sampling distribution (samples={len(all_pm2_5_rates)}, particles/sample={num_particles}, viscosity={viscosity:.5f})')
+        plt.suptitle('Initial particle mix: 70% PM2.5, 30% PM10 (by number)')
+        plt.axvline(all_mean_pm2_5_rate, color='blue', linestyle='--', label=f'PM2.5 mean {all_mean_pm2_5_rate:.6f}')
+        plt.axvline(all_mean_pm10_rate, color='orange', linestyle='--', label=f'PM10 mean {all_mean_pm10_rate:.6f}')
+        plt.text(0.95, 0.95, f'PM2.5 σ={all_std_pm2_5_rate:.6f}\nPM10 σ={all_std_pm10_rate:.6f}', transform=plt.gca().transAxes, ha='right', va='top', bbox=dict(facecolor='white', alpha=0.75))
         plt.legend()
         plt.tight_layout()
 
@@ -424,6 +456,76 @@ def plot_monthly_caught_histograms(monthly_results, out_dir='monthly_caught_hist
         print(f"Saved all-month capture rate sampling histogram to {filename_all_rate}")
 
     print(f"Saved monthly aggregated CSV data to {csv_path}")
+
+
+def plot_summary_from_csv(csv_path='monthly_sampling.csv', output_path_percent='percent_caught.png', output_path_rate='rate_caught.png'):
+    import csv
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        raise ImportError("matplotlib is required for plotting, install with: pip install matplotlib")
+
+    months = []
+    pm25_mean = []
+    pm25_std = []
+    pm10_mean = []
+    pm10_std = []
+    pm25_rate = []
+    pm10_rate = []
+
+    with open(csv_path, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            months.append(row['month'])
+            pm25_mean.append(float(row['pm2_5_mean_rate']))
+            pm25_std.append(float(row['pm2_5_std_rate']))
+            pm10_mean.append(float(row['pm10_mean_rate']))
+            pm10_std.append(float(row['pm10_std_rate']))
+            pm25_rate.append(float(row['pm2_5_capture_rate']))
+            pm10_rate.append(float(row['pm10_capture_rate']))
+
+    x = range(len(months))
+
+    # Percent caught plot from mean and std
+    plt.figure(figsize=(12, 6))
+    plt.errorbar(x, [v*100 for v in pm25_mean], yerr=[s*100 for s in pm25_std], fmt='o-', label='PM2.5 mean % caught', capsize=4)
+    plt.errorbar(x, [v*100 for v in pm10_mean], yerr=[s*100 for s in pm10_std], fmt='s-', label='PM10 mean % caught', capsize=4)
+    plt.xticks(x, months, rotation=45)
+    plt.xlabel('Month')
+    plt.ylabel('Mean percent caught (%)')
+    plt.title('Monthly mean percent caught (with std error bars)')
+    plt.suptitle('Initial particle fraction used in simulation: 70% PM2.5, 30% PM10 by number')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path_percent)
+    try:
+        plt.show()
+    except Exception:
+        pass
+    plt.close()
+    print(f"Saved percent summary chart to {output_path_percent}")
+
+    # Capture rate chart
+    plt.figure(figsize=(12, 6))
+    plt.errorbar(x, pm25_mean, yerr=pm25_std, fmt='o-', label='PM2.5 mean capture rate', capsize=4)
+    plt.errorbar(x, pm10_mean, yerr=pm10_std, fmt='s-', label='PM10 mean capture rate', capsize=4)
+    plt.plot(x, pm25_rate, 'b--', alpha=0.6, label='PM2.5 capture rate')
+    plt.plot(x, pm10_rate, 'r--', alpha=0.6, label='PM10 capture rate')
+    plt.xticks(x, months, rotation=45)
+    plt.xlabel('Month')
+    plt.ylabel('Capture rate (fraction of particles captured per simulation run, unitless)')
+    plt.title('Monthly capture rate summary with mean/std and actual rates')
+    plt.suptitle('Rate unit: fraction of particles captured out of the particle batch (not time-based)')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path_rate)
+    try:
+        plt.show()
+    except Exception:
+        pass
+    plt.close()
+    print(f"Saved rate summary chart to {output_path_rate}")
+
 
 
 def sampling_histograms_by_month(monthly_results, samples=100, out_dir='monthly_sampling_hists'):
@@ -527,7 +629,7 @@ def simulate_monthly_smog_tower(
 
 def simulate_monthly_sampling(
     samples=100,
-    num_particles=10000,
+    num_particles=5000,
     dt=0.01,
     max_time=180.0,
     tower_x=0.0,
@@ -603,9 +705,11 @@ def simulate_monthly_sampling(
 
 
 if __name__ == "__main__":
+    print("Simulation configuration: initial particle mix 70% PM2.5, 30% PM10 by number; capture rates are fraction per simulation run, not time-based.")
+    print("Particle count per sample:", 5000)
     monthly_samples = simulate_monthly_sampling(
         samples=100,
-        num_particles=10000,
+        num_particles=5000,
         dt=0.01,
         max_time=180.0,
         spawn_x_min=-10.0,
@@ -635,6 +739,7 @@ if __name__ == "__main__":
 
     try:
         plot_monthly_caught_histograms(monthly_samples, out_dir='monthly_sampling_hists', csv_path='monthly_sampling.csv', show_plots=False)
+        plot_summary_from_csv(csv_path='monthly_sampling.csv', output_path_percent='percent_caught.png', output_path_rate='rate_caught.png')
     except ImportError:
         print("matplotlib not available; skip plotting.")
 
