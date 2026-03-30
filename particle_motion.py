@@ -5,7 +5,7 @@ viscosity_air = 1.81e-5  # kg/(m·s), dynamic viscosity of air at room temperatu
 
 class Air:
     def __init__(self, **kwargs):
-        self.velocity = float(kwargs.get("velocity", 0.0))  # m/s
+        self.velocity = [float(v) for v in kwargs.get("velocity", [0.0, 0.0])]  # m/s
         self.density = float(kwargs.get("density", 1.225))  # kg/m^3 at sea level
 
 class Particle:
@@ -55,17 +55,11 @@ class Particle:
     def force_y(self, air: Air):
         return self.buoyancy(air) - self.stokes(air, 1)  # Buoyancy minus drag in y direction
 
-    def acceleration_x(self, air: Air):
-        return self.force_x(air) / self.mass
-
-    def acceleration_y(self, air: Air):
-        return self.force_y(air) / self.mass
-
     def update_particle(self, air: Air, dt: float = 1.0):
         self.v_apparent = [self.velocity[0] - air.velocity[0], self.velocity[1] - air.velocity[1]]
 
-        ax = self.acceleration_x(air)
-        ay = self.acceleration_y(air)
+        ax = self.force_x(air) / self.mass
+        ay = self.force_y(air) / self.mass
 
         self.position[0] += self.velocity[0] * dt + 0.5 * ax * dt ** 2
         self.position[1] += self.velocity[1] * dt + 0.5 * ay * dt ** 2
