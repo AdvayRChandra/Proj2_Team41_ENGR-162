@@ -47,15 +47,18 @@ class Particle:
         stokes_x *= math.pi / 8 * self.diameter**2 * self.magnitude_velocity(self.v_apparent) * self.v_apparent[dimension]
         return stokes_x
     
-    def electrostatic_force(self, surfaceChargeDensity: float):
+    def electrostatic_force(self, surface_charge_density: float, concentration: float, collector_plate_x: float, max_distance: float):
         # Electrostatic force due to surface charge density
-        return self.charge * surfaceChargeDensity / e0
+        collector_plate_distance = self.position[0] - collector_plate_x
+        ambient_factor = collector_plate_distance - max_distance if collector_plate_distance > max_distance else 0
+
+        return ((self.charge ** 2 * concentration) * ambient_factor - self.charge * surface_charge_density) / (2 * e0)
 
     def buoyancy(self, air: Air):
         return g * (self.density - air.density) * self.mass  # Buoyant force minus weight
 
     def force_x(self, air: Air):
-        return self.stokes(air, 0)  # Drag in x direction
+        return self.stokes(air, 0) + self.electrostatic_force(air)  # Drag in x direction
 
     def force_y(self, air: Air):
         return self.buoyancy(air) - self.stokes(air, 1)  # Buoyancy minus drag in y direction
